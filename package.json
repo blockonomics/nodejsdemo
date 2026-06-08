@@ -1,0 +1,31 @@
+{
+  "name": "blockonomics-buttons",
+  "version": "1.0.0",
+  "description": "Bitcoin Payment Buttons and Widgets in Node.js with Blockonomics — hosted checkout, webhooks, SQLite order storage, and an admin dashboard.",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "keywords": [
+    "bitcoin",
+    "blockonomics",
+    "payments",
+    "payment-button",
+    "widget",
+    "express",
+    "crypto"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.7",
+    "better-sqlite3": "^11.3.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
+  }
+}
