@@ -14,7 +14,7 @@ and your internal order id.
 
 **Product page — "Pay with Crypto" button (opens Blockonomics' hosted checkout)**
 
-![Satoshi Books product page with Pay with Crypto button](docs/product-page.png)
+<img width="1098" height="682" alt="image" src="https://github.com/user-attachments/assets/bb601411-c288-41fa-99ad-42956f9a36a0" />
 
 ## Features
 
