@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pay with USDT — Threadonomics</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <!-- Blockonomics Web3 USDT component. -->
+    <script src="https://blockonomics.co/js/web3-payment.js"></script>
+  </head>
+  <body>
+    <main class="pay">
+      <a class="back" href="/">← back to shop</a>
+      <h1 id="title">Pay with USDT</h1>
+
+      <div id="loading">Loading…</div>
+
+      <div id="card" class="card" hidden>
+        <img id="qr" class="qr" alt="payment QR code" />
+        <p class="amount"><span id="amountUsdt"></span> USDT</p>
+        <p class="fiat">for <span id="amountFiat"></span></p>
+
+        <label>Send to this address</label>
+        <code id="address" class="address"></code>
+
+        <!-- Preferred path: pay straight from a browser wallet. -->
+        <div id="web3mount"></div>
+
+        <!-- Fallback: paste the txhash yourself. -->
+        <details class="manual">
+          <summary>No browser wallet? Paste your transaction hash</summary>
+          <p class="hint">
+            Send the exact amount above, then paste the <code>0x…</code> hash here.
+          </p>
+          <input id="txhash" placeholder="0x…" />
+          <button id="submitTx">I've sent it →</button>
+          <p id="txErr" class="err"></p>
+        </details>
+
+        <div id="statusRow" class="status">
+          <span class="dot" id="dot"></span>
+          <span id="status">waiting for payment…</span>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const orderId = location.pathname.split("/").pop();
+      let order;
+
+      async function load() {
+        const res = await fetch(`/api/orders/${orderId}`);
+        order = await res.json();
+        if (!res.ok) {
+          document.getElementById("loading").textContent = order.error || "not found";
+          return;
+        }
+
+        document.getElementById("loading").hidden = true;
+        document.getElementById("card").hidden = false;
+        document.getElementById("qr").src = order.qrDataUrl;
+        document.getElementById("amountUsdt").textContent = order.amountUsdt;
+        document.getElementById("amountFiat").textContent =
+          order.currency + " " + order.amountFiat;
+        document.getElementById("address").textContent = order.address;
+        document.getElementById("title").textContent = `Pay for ${order.productName}`;
+
+        setupWeb3();
+        paint(order.status, order.confirmations);
+        poll();
+      }
+
+      // Drop in the Web3 component and wire onTxnSubmitted -------------------
+      function setupWeb3() {
+        const el = document.createElement("web3-payment");
+        el.setAttribute("order_amount", order.amountUsdt);
+        el.setAttribute("receive_address", order.usdtReceiveAddress);
+        // testnet is 1/0 (matches Blockonomics' monitor_tx convention). Note the
+        // component derives its actual network from the connected wallet, not this
+        // attribute — the wallet must be on Sepolia for a testnet payment.
+        el.setAttribute("testmode", order.testnet);
+        document.getElementById("web3mount").appendChild(el);
+
+        // The component hands us the txhash before the user even confirms in the
+        // wallet UI. Per the docs it emits onTxnSubmitted with { crypto, txhash };
+        // depending on the build that arrives as the event detail or the event
+        // itself, so read both. Forward to our backend, which calls monitor_tx.
+        el.addEventListener("onTxnSubmitted", (e) => {
+          const result = e.detail ?? e;
+          if (result?.txhash) submitTx(result.txhash);
+        });
+
+        // Manual fallback for wallets the component can't drive.
+        document.getElementById("submitTx").addEventListener("click", () => {
+          submitTx(document.getElementById("txhash").value.trim());
+        });
+      }
+
+      async function submitTx(txhash) {
+        const txErr = document.getElementById("txErr");
+        txErr.textContent = "";
+        const res = await fetch(`/pay/${orderId}/submit-tx`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ txhash }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          txErr.textContent = data.error || "could not submit";
+          return;
+        }
+        paint("submitted", 0);
+      }
+
+      // status polling ------------------------------------------------------
+      function paint(status, confirmations) {
+        const label = {
+          pending: "waiting for payment…",
+          submitted: "watching your transaction…",
+          partial: `seen on-chain (${confirmations}/2 confirmations)…`,
+          paid: "✅ paid — thank you!",
+          failed: "❌ transaction reverted",
+        };
+        document.getElementById("status").textContent = label[status] || status;
+        document.getElementById("dot").className = "dot " + status;
+      }
+
+      function poll() {
+        const t = setInterval(async () => {
+          const res = await fetch(`/pay/${orderId}/status`);
+          const s = await res.json();
+          paint(s.status, s.confirmations);
+          if (s.status === "paid" || s.status === "failed") clearInterval(t);
+        }, 4000);
+      }
+
+      load();
+    </script>
+  </body>
+</html>
