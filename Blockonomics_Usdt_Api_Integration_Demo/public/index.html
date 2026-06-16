@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Threadonomics — pay with USDT</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shop">
+      <h1>🧵 Threadonomics</h1>
+      <p class="tagline">One t-shirt. Paid in USDT, no price wobble.</p>
+
+      <section class="product">
+        <div class="photo">👕</div>
+        <div class="details">
+          <h2>The Only T-Shirt</h2>
+          <p>Heavyweight cotton. Ships nowhere — it's a demo.</p>
+          <p class="price">$1.00</p>
+
+          <p class="coin-note">₮ Pays in USDT (ERC-20) on Ethereum</p>
+
+          <button id="buy" class="buy">Checkout with USDT →</button>
+          <p id="err" class="err"></p>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      document.getElementById("buy").addEventListener("click", async () => {
+        const err = document.getElementById("err");
+        err.textContent = "";
+        try {
+          const res = await fetch("/checkout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              amountFiat: 1,
+              currency: "USD",
+              productName: "The Only T-Shirt",
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "checkout failed");
+          location.href = `/pay/${data.orderId}`;
+        } catch (e) {
+          err.textContent = e.message;
+        }
+      });
+    </script>
+  </body>
+</html>

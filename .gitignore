@@ -1,8 +1,16 @@
+# Dependencies
 node_modules/
+
+# Secrets
 .env
+
+# SQLite runtime artifacts (regenerated on run)
 *.db
 *.db-journal
 *.db-wal
 *.db-shm
-npm-debug.log*
+*.sqlite
+
+# OS / editor
 .DS_Store
+npm-debug.log*
