@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Baggonomics — bags, paid in Bitcoin</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shop">
+      <h1>👜 Baggonomics</h1>
+      <p class="tagline">Carry-everything bags, paid on-chain in Bitcoin.</p>
+
+      <p class="coin-note">₿ Every order is paid in Bitcoin (on-chain)</p>
+
+      <section class="grid" id="grid"></section>
+      <p id="err" class="err"></p>
+    </main>
+
+    <script>
+      // A tiny catalog. The backend is product-agnostic — checkout just takes a
+      // name + fiat price — so the whole store lives here.
+      const PRODUCTS = [
+        { emoji: "🎒", name: "Trekker Backpack", desc: "30L weekender. Padded straps.", price: 89 },
+        { emoji: "👜", name: "City Tote", desc: "Waxed canvas, leather handles.", price: 64 },
+        { emoji: "💼", name: "Commuter Briefcase", desc: "Fits a 16\" laptop.", price: 120 },
+        { emoji: "🧳", name: "Cabin Roller", desc: "Carry-on, hard shell.", price: 150 },
+        { emoji: "👝", name: "Belt Pouch", desc: "Everyday sling, water-resistant.", price: 35 },
+        { emoji: "🛍️", name: "Market Shopper", desc: "Foldable, recycled fabric.", price: 22 },
+      ];
+
+      const CURRENCY = "USD";
+      const err = document.getElementById("err");
+      const grid = document.getElementById("grid");
+
+      function money(n) {
+        return new Intl.NumberFormat("en-US", { style: "currency", currency: CURRENCY }).format(n);
+      }
+
+      async function checkout(product, btn) {
+        err.textContent = "";
+        btn.disabled = true;
+        const original = btn.textContent;
+        btn.textContent = "Creating order…";
+        try {
+          const res = await fetch("/checkout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              amountFiat: product.price,
+              currency: CURRENCY,
+              productName: product.name,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "checkout failed");
+          location.href = `/pay/${data.orderId}`;
+        } catch (e) {
+          err.textContent = e.message;
+          btn.disabled = false;
+          btn.textContent = original;
+        }
+      }
+
+      for (const p of PRODUCTS) {
+        const card = document.createElement("section");
+        card.className = "product card-product";
+        card.innerHTML = `
+          <div class="photo">${p.emoji}</div>
+          <div class="details">
+            <h2>${p.name}</h2>
+            <p>${p.desc}</p>
+            <p class="price">${money(p.price)}</p>
+            <button class="buy">Pay with Bitcoin →</button>
+          </div>`;
+        card.querySelector(".buy").addEventListener("click", (e) => checkout(p, e.target));
+        grid.appendChild(card);
+      }
+    </script>
+  </body>
+</html>
