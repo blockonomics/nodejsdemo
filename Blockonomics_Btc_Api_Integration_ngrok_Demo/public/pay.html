@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pay with Bitcoin — Baggonomics</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="pay">
+      <a class="back" href="/">← back to shop</a>
+      <h1 id="title">Pay with Bitcoin</h1>
+
+      <div id="loading">Loading…</div>
+
+      <div id="card" class="card" hidden>
+        <img id="qr" class="qr" alt="payment QR code" />
+        <p class="amount"><span id="amountBtc"></span> BTC</p>
+        <p class="fiat">for <span id="amountFiat"></span></p>
+
+        <label>Send to this address</label>
+        <code id="address" class="address"></code>
+
+        <div id="statusRow" class="status">
+          <span class="dot" id="dot"></span>
+          <span id="status">waiting for payment…</span>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const orderId = location.pathname.split("/").pop();
+      let order;
+
+      async function load() {
+        const res = await fetch(`/api/orders/${orderId}`);
+        order = await res.json();
+        if (!res.ok) {
+          document.getElementById("loading").textContent = order.error || "not found";
+          return;
+        }
+
+        document.getElementById("loading").hidden = true;
+        document.getElementById("card").hidden = false;
+        document.getElementById("qr").src = order.qrDataUrl;
+        document.getElementById("amountBtc").textContent = order.amountBtc;
+        document.getElementById("amountFiat").textContent =
+          order.currency + " " + order.amountFiat;
+        document.getElementById("address").textContent = order.address;
+        document.getElementById("title").textContent = `Pay for ${order.productName}`;
+
+        paint(order.status, order.confirmations);
+        listenForPayment(order.address);
+        poll();
+      }
+
+      // Real-time UX: Blockonomics pushes address updates over a WebSocket the
+      // instant a payment is seen. This is for INSTANT FEEDBACK only — the
+      // server-side webhook is the source of truth. Never ship off this alone.
+      function listenForPayment(address) {
+        try {
+          const ws = new WebSocket(`wss://www.blockonomics.co/payment/${address}`);
+          ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            // status: 0 unconfirmed, 1 partial, 2 confirmed, -1 failed
+            if (data.status >= 0) {
+              const status = data.status >= 2 ? "completed" : "paid";
+              paint(status, data.status);
+            } else {
+              paint("failed", 0);
+            }
+          };
+        } catch {
+          /* WebSocket is best-effort; the poll below is the backstop. */
+        }
+      }
+
+      function paint(status, confirmations) {
+        const label = {
+          pending: "waiting for payment…",
+          paid: `payment seen (${confirmations}/2 confirmations)…`,
+          completed: "✅ confirmed — thank you!",
+          failed: "❌ transaction failed",
+        };
+        document.getElementById("status").textContent = label[status] || status;
+        document.getElementById("dot").className = "dot " + status;
+      }
+
+      // Backstop poll against our own DB, which the webhook updates. Keeps the
+      // page correct even if the WebSocket drops.
+      function poll() {
+        const t = setInterval(async () => {
+          const res = await fetch(`/pay/${orderId}/status`);
+          const s = await res.json();
+          paint(s.status, s.confirmations);
+          if (s.status === "completed" || s.status === "failed") clearInterval(t);
+        }, 4000);
+      }
+
+      load();
+    </script>
+  </body>
+</html>
